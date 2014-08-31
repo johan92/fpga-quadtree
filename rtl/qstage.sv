@@ -12,7 +12,7 @@ module qstage
   input                                 clk_i,
   input                                 rst_i,
 
-  qstage_ctrl_if.app                    ctrl_if,
+  qstage_ctrl_if                        ctrl_if,
   
   input                                 lookup_en_i,
   input              [A_WIDTH-1:0]      lookup_addr_i,
@@ -60,18 +60,18 @@ always_ff @( posedge clk_i or posedge rst_i )
 
 simple_ram
 #( 
-  .DATA_WIDTH                             ( $bits(ram_data_t) ), 
-  .ADDR_WIDTH                             ( A_WIDTH           )
+  .DATA_WIDTH                             ( $bits(ram_data_t)              ), 
+  .ADDR_WIDTH                             ( A_WIDTH                        )
 ) tr_ram(
 
-  .clk                                    ( clk_i             ),
+  .clk                                    ( clk_i                          ),
 
-  .write_addr                             ( ctrl_if.wr_addr   ),
-  .data                                   ( ctrl_if.wr_data   ),
-  .we                                     ( ctrl_if.wr_en     ),
+  .write_addr                             ( ctrl_if.wr_addr[A_WIDTH-1:0]   ),
+  .data                                   ( ctrl_if.wr_data                ),
+  .we                                     ( ctrl_if.wr_en                  ),
 
-  .read_addr                              ( lookup_addr_i     ),
-  .q                                      ( rd_data_w         )
+  .read_addr                              ( lookup_addr_i                  ),
+  .q                                      ( rd_data_w                      )
 );
 
 // less or equal values l, m, r
@@ -88,7 +88,7 @@ logic [1:0] next_addr_hdr;
 
 always_ff @( posedge clk_i )
   begin
-    casex( { le_l, le_m, le_r } ):
+    casex( { le_l, le_m, le_r } )
       3'b01x:  next_addr_hdr <= 'd1;
       3'b001:  next_addr_hdr <= 'd2;
       3'b000:  next_addr_hdr <= 'd3;
