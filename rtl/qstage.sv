@@ -1,77 +1,71 @@
 `include "defs.vh"
 
-module qstage
-#( 
-  parameter A_WIDTH      = 4,
-
-  parameter NEXT_A_WIDTH = 6, 
-
-  parameter D_WIDTH      = 16
-)
-(
+module qstage #( 
+  parameter IN_ADDR_WIDTH  = 4,
+  parameter OUT_ADDR_WIDTH = 6, 
+  parameter DATA_WIDTH     = 16
+) (
   input                                 clk_i,
   input                                 rst_i,
 
   qstage_ctrl_if                        ctrl_if,
   
-  input                                 lookup_en_i,
-  input              [A_WIDTH-1:0]      lookup_addr_i,
-  input              [D_WIDTH-1:0]      lookup_data_i,
+  input                                 lookup_valid_i,
+  input          [IN_ADDR_WIDTH - 1:0]  lookup_addr_i,
+  input          [DATA_WIDTH    - 1:0]  lookup_data_i,
   
-  output                                lookup_en_o,
-  output             [NEXT_A_WIDTH-1:0] lookup_addr_o,
-  output             [D_WIDTH-1:0]      lookup_data_o
+  output                                lookup_valid_o,
+  output         [OUT_ADDR_WIDTH - 1:0] lookup_addr_o,
+  output         [DATA_WIDTH     - 1:0] lookup_data_o
 
 );
 
-ram_data_t          rd_data_w;
+ram_data_t                rd_data_w;
 
-logic               lookup_en_d1;
-logic               lookup_en_d2;
+logic                     lookup_valid_d1;
+logic                     lookup_valid_d2;
 
-logic [A_WIDTH-1:0] lookup_addr_d1;
-logic [A_WIDTH-1:0] lookup_addr_d2;
+logic [IN_ADDR_WIDTH-1:0] lookup_addr_d1;
+logic [IN_ADDR_WIDTH-1:0] lookup_addr_d2;
 
-logic [D_WIDTH-1:0] lookup_data_d1;
-logic [D_WIDTH-1:0] lookup_data_d2;
+logic [DATA_WIDTH-1:0]    lookup_data_d1;
+logic [DATA_WIDTH-1:0]    lookup_data_d2;
 
 always_ff @( posedge clk_i or posedge rst_i )
   if( rst_i  )
     begin
-      lookup_en_d1   <= '0;
-      lookup_addr_d1 <= '0;
-      lookup_data_d1 <= '0;
+      lookup_valid_d1  <= 1'b0;
+      lookup_addr_d1   <= 'x;
+      lookup_data_d1   <= 'x;
 
-      lookup_en_d2   <= '0;
-      lookup_addr_d2 <= '0;
-      lookup_data_d2 <= '0;
+      lookup_valid_d2  <= 1'b0;
+      lookup_addr_d2   <= 'x;
+      lookup_data_d2   <= 'x;
     end
   else
     begin
-      lookup_en_d1   <= lookup_en_i;
-      lookup_addr_d1 <= lookup_addr_i;
-      lookup_data_d1 <= lookup_data_i;
+      lookup_valid_d1  <= lookup_valid_i;
+      lookup_addr_d1   <= lookup_addr_i;
+      lookup_data_d1   <= lookup_data_i;
       
-      lookup_en_d2   <= lookup_en_d1;   
-      lookup_addr_d2 <= lookup_addr_d1; 
-      lookup_data_d2 <= lookup_data_d1; 
+      lookup_valid_d2  <= lookup_valid_d1;   
+      lookup_addr_d2   <= lookup_addr_d1; 
+      lookup_data_d2   <= lookup_data_d1; 
     end
 
 
-simple_ram
-#( 
-  .DATA_WIDTH                             ( $bits(ram_data_t)              ), 
-  .ADDR_WIDTH                             ( A_WIDTH                        )
+simple_ram #( 
+  .DATA_WIDTH                             ( $bits(ram_data_t)                  ), 
+  .ADDR_WIDTH                             ( IN_ADDR_WIDTH                      )
 ) tr_ram(
+  .clk                                    ( clk_i                              ),
 
-  .clk                                    ( clk_i                          ),
+  .write_addr                             ( ctrl_if.wr_addr[IN_ADDR_WIDTH-1:0] ),
+  .data                                   ( ctrl_if.wr_data                    ),
+  .we                                     ( ctrl_if.wr_en                      ),
 
-  .write_addr                             ( ctrl_if.wr_addr[A_WIDTH-1:0]   ),
-  .data                                   ( ctrl_if.wr_data                ),
-  .we                                     ( ctrl_if.wr_en                  ),
-
-  .read_addr                              ( lookup_addr_i                  ),
-  .q                                      ( rd_data_w                      )
+  .read_addr                              ( lookup_addr_i                      ),
+  .q                                      ( rd_data_w                          )
 );
 
 // less or equal values l, m, r
@@ -96,10 +90,10 @@ always_ff @( posedge clk_i )
     endcase
   end
 
-assign lookup_addr_o = ( A_WIDTH == 1 ) ? (                   next_addr_hdr   ):
-                                          ( { lookup_addr_d2, next_addr_hdr } );
+assign lookup_addr_o = ( IN_ADDR_WIDTH == 1 ) ? (                   next_addr_hdr   ):
+                                                ( { lookup_addr_d2, next_addr_hdr } );
 
-assign lookup_en_o   = lookup_en_d2;
-assign lookup_data_o = lookup_data_d2;
+assign lookup_valid_o = lookup_valid_d2;
+assign lookup_data_o  = lookup_data_d2;
 
 endmodule
