@@ -3,11 +3,21 @@ proc do_compile {} {
   
   vlib work
   
+  set INC_DIR "+incdir+"
+  set INC_DIR "$INC_DIR+./"
+  set INC_DIR "$INC_DIR+../rtl/"
+
   vlog -sv altera/verbosity_pkg.sv
   vlog -sv altera/avalon_utilities_pkg.sv
   vlog -sv altera/altera_avalon_st_source_bfm.sv
   
-  vlog -sv top_tb.sv 
+  vlog -sv ${INC_DIR} ../rtl/delay.sv
+  vlog -sv ${INC_DIR} ../rtl/qtree_level.sv
+  vlog -sv ${INC_DIR} ../rtl/qtree_match.sv
+  vlog -sv ${INC_DIR} ../rtl/qtree_top.sv
+  vlog -sv ${INC_DIR} ../rtl/simple_ram.v
+  vlog -sv ${INC_DIR} ../rtl/simple_ram_with_delay.sv
+  vlog -sv ${INC_DIR} top_tb.sv 
 
 }
 

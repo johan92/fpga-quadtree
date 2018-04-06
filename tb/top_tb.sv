@@ -1,6 +1,12 @@
-`include "../rtl/defs.vh"
-
 module top_tb;
+localparam LEVEL_CNT      = 5;
+localparam KEY_WIDTH      = 16;
+localparam MATCH_CELL_CNT = 4;
+
+localparam BYPASS_WIDTH   = 1;
+
+`include "defs.vh"
+`include "tb_defs.vh"
 
 logic clk;
 logic rst;
@@ -24,59 +30,20 @@ initial
   end
 
 
-function int read_tree( input string fname );
-  integer fd;
-  integer code;
-  
-  int stage;
-  int addr;
-  ram_data_t data;
-
-  fd = $fopen( fname, "r" );
-  
-  while( 1 )
-    begin
-      code = $fscanf( fd, "%d %d %d %d %d ", stage, addr, data.l, data.m, data.r );
-
-      if( code <= 0 )
-        begin
-          return 0;
-        end
-
-      $display("%d %d %d %d %d", stage, addr, data.l, data.m, data.r );
-    end
-  
-endfunction
+Segments     segments;
+LevelRamData level_ram_data;
+MatchRamData match_ram_data;
 
 initial
   begin
-    read_tree("tree");
+    segments = new();
+    level_ram_data = new();
+    match_ram_data = new();
+
+    segments.load("in_segments");
+    level_ram_data.load("in_segments_stage_ram");
+    match_ram_data.load("in_segments_match_ram");
   end
-
-
-qstage_ctrl_if 
-#
-(
-  .A_WIDTH             ( 8           ),
-  .D_TYPE              ( ram_data_t  ),
-  .PARTS_CNT           ( `STAGES_CNT )
-) stages_ctrl_if (
-
-  .clk_i ( clk )
-
-);
-
-qstage_ctrl_if 
-#
-(
-  .A_WIDTH             ( 8                 ),
-  .D_TYPE              ( match_ram_data_t  ),
-  .PARTS_CNT           ( `D_CNT            )
-) match_ctrl_if (
-
-  .clk_i ( clk )
-
-);
 
 //  --------------------------------------------------------------------------- 
 //  ST BFM 
@@ -136,24 +103,85 @@ task automatic st_bfm_send( logic [31:0] _data );
    st_bfm.push_transaction();
 endtask
 
+//  --------------------------------------------------------------------------- 
+//  MM 
+//  ---------------------------------------------------------------------------
+localparam MM_ADDR_WIDTH = ( $bits(mm_addr_level_t) > $bits(mm_addr_match_t) ) ? ( $bits(mm_addr_level_t) + 1 ):
+                                                                                 ( $bits(mm_addr_match_t) + 1 );
+localparam MM_DATA_WIDTH = 128;
+
+logic [MM_ADDR_WIDTH-1:0] mm_ctrl_addr;
+logic [MM_DATA_WIDTH-1:0] mm_ctrl_data;
+logic                     mm_ctrl_write;
+
+task automatic ctrl_level_ram();
+  @(posedge clk);
+
+  foreach(level_ram_data.cmds[i]) begin
+    mm_ctrl_addr <= level_ram_data.cmds[i].addr;
+    mm_ctrl_addr[MM_ADDR_WIDTH-1] <= 1'b0;
+    
+    mm_ctrl_data  <= level_ram_data.cmds[i].data
+    mm_ctrl_write <= 1'b0;
+    
+    @(posedge clk);
+    mm_ctrl_write <= 1'b1;
+    
+    @(posedge clk);
+    mm_ctrl_write <= 1'b0;
+  end
+endtask
+
+task automatic ctrl_match_ram();
+  @(posedge clk);
+
+  foreach(match_ram_data.cmds[i]) begin
+    mm_ctrl_addr <= match_ram_data.cmds[i].addr;
+    mm_ctrl_addr[MM_ADDR_WIDTH-1] <= 1'b1;
+    
+    mm_ctrl_data  <= match_ram_data.cmds[i].data
+    mm_ctrl_write <= 1'b0;
+    
+    @(posedge clk);
+    mm_ctrl_write <= 1'b1;
+    
+    @(posedge clk);
+    mm_ctrl_write <= 1'b0;
+  end
+endtask
+
+initial begin
+  wait(rst_done);
+
+  ctrl_level_ram();
+  ctrl_match_ram();
+end
+
 qtree_top #( 
-  .STAGES                                 ( `STAGES_CNT ),
-  .D_WIDTH                                ( `D_WIDTH    ),
-  .D_CNT                                  ( `D_CNT      )
+  .LEVEL_CNT                              ( LEVEL_CNT         ),
+  .KEY_WIDTH                              ( KEY_WIDTH         ),
+  .MATCH_CELL_CNT                         ( MATCH_CELL_CNT    ),
+
+  .BYPASS_WIDTH                           ( BYPASS_WIDTH      ),
+  
+  .MM_ADDR_WIDTH                          ( MM_ADDR_WIDTH     ),
+  .MM_DATA_WIDTH                          ( MM_DATA_WIDTH     )
 ) dut (
   .clk_i                                  ( clk               ),
   .rst_i                                  ( rst               ),
+  
+  .mm_ctrl_addr_i                         ( mm_ctrl_addr      ),
+  .mm_ctrl_data_i                         ( mm_ctrl_data      ),
+  .mm_ctrl_write_i                        ( mm_ctrl_write     ),
 
-  .stages_ctrl_if                         ( stages_ctrl_if    ),
-  .match_ctrl_if                          ( match_ctrl_if     ),
-
-  .lookup_en_i                            ( lookup_en_i       ),
-  .lookup_data_i                          ( lookup_data_i     ),
+  .lookup_data_i                          ( st_bfm_data       ),
+  .lookup_bypass_i                        ( 1'b0              ),
+  .lookup_valid_i                         ( st_bfm_valid      ),
     
-  .lookup_done_o                          ( lookup_done_o     ),
-  .lookup_match_o                         ( lookup_match_o    ),
-  .lookup_addr_o                          ( lookup_addr_o     ),
-  .lookup_data_o                          ( lookup_data_o     )
+  .lookup_valid_o                         (    ),
+  .lookup_match_o                         (    ),
+  .lookup_bypass_o                        (    ),
+  .lookup_addr_o                          (    )
 
 );
 
