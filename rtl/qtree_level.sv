@@ -1,4 +1,4 @@
-module qstage #(
+module qtree_level #(
   parameter ADDR_WIDTH     = 4,
   parameter KEY_WIDTH      = 16,
   parameter DATA_WIDTH     = 16,
@@ -33,39 +33,38 @@ module qstage #(
 `include "defs.vh"
 
 typedef struct packed {
-  qstage_data_t              in_data;
+  level_data_t              in_data;
 
-  logic                      le_l;
-  logic                      le_m;
-  logic                      le_r;
+  logic                     le_l;
+  logic                     le_m;
+  logic                     le_r;
 
-  logic [1:0]                next_addr_postfix;
+  logic [1:0]               next_addr_postfix;
   
-  logic [BYPASS_WIDTH-1:0]   bypass_data;
-} qstage_pipe_data_t;
+  logic [BYPASS_WIDTH-1:0]  bypass_data;
+} level_pipe_data_t;
 
-ram_data_t                rd_data_w;
-qstage_data_t             in_data;
+level_data_t             in_data;
 
-qstage_pipe_data_t        stage0_in;
-logic                     stage0_in_valid;
+level_pipe_data_t        stage0_in;
+logic                    stage0_in_valid;
 
-qstage_pipe_data_t        stage0_out; 
-logic                     stage0_out_valid;
+level_pipe_data_t        stage0_out; 
+logic                    stage0_out_valid;
 
-qstage_pipe_data_t        stage1_in;
-logic                     stage1_in_valid;
+level_pipe_data_t        stage1_in;
+logic                    stage1_in_valid;
 
-qstage_pipe_data_t        stage1_out; 
-logic                     stage1_out_valid;
+level_pipe_data_t        stage1_out; 
+logic                    stage1_out_valid;
 
 assign in_data = in_data_i; 
 
 //  --------------------------------------------------------------------------- 
 //  STAGE 0: Reading from RAM
 //  ---------------------------------------------------------------------------
-qstage_ram_data_t     ram_read_data;
-qstage_pipe_data_t    stage0_ram_out;
+level_ram_data_t     ram_read_data;
+level_pipe_data_t    stage0_ram_out;
 logic                 stage0_ram_out_valid;
 
 always_comb begin
@@ -156,7 +155,7 @@ delay #(
 //  --------------------------------------------------------------------------- 
 //  STAGE 2: Output "calculations"
 //  ---------------------------------------------------------------------------
-qstage_data_t            out_data;
+level_data_t             out_data;
 logic                    out_valid;
 logic [BYPASS_WIDTH-1:0] out_bypass;
 always_comb begin

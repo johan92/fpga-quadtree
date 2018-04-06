@@ -4,25 +4,26 @@ module qtree_match #(
    parameter IN_ADDR_WIDTH  = 4,
    parameter OUT_ADDR_WIDTH = 6, 
 
-   parameter DATA_WIDTH     = 16,
-
-   parameter D_CNT          = 4
+   parameter IN_DATA_WIDTH     = 16,
+   
+   parameter MATCH_CELL_CNT   = 4
+   parameter MATCH_CELL_CNT_WIDTH = $clog2(MATCH_CELL_CNT)
 ) (
-  input                         clk_i,
-  input                         rst_i,
+  input                               clk_i,
+  input                               rst_i,
   
-  input  [RAM_DATA_WIDTH - 1:0] mm_ram_data_i,
-  input  [RAM_ADDR_WIDTH - 1:0] mm_ram_addr_i,
-  input                         mm_ram_write_i,
+  input  [RAM_DATA_WIDTH       - 1:0] ram_data_i,
+  input  [RAM_ADDR_WIDTH       - 1:0] ram_addr_i,
+  input  [MATCH_CELL_CNT_WIDTH - 1:0] ram_cell_i,
+  input                               ram_write_i,
   
-  input  [DATA_WIDTH     - 1:0] in_data_i,
-  input  [BYPASS_WIDTH   - 1:0] in_bypass_i,
-  input                         in_valid_i,
+  input  [IN_DATA_WIDTH  - 1:0]       in_data_i,
+  input  [BYPASS_WIDTH   - 1:0]       in_bypass_i,
+  input                               in_valid_i,
 
-  output                        lookup_match_o,
-  output [OUT_ADDR_WIDTH - 1:0] lookup_addr_o,
-  output [DATA_WIDTH     - 1:0] lookup_data_o,
-  output                        lookup_valid_o
+  output                              lookup_match_o,
+  output [OUT_ADDR_WIDTH - 1:0]       lookup_addr_o,
+  output                              lookup_valid_o
 
 );
 
@@ -31,9 +32,9 @@ module qtree_match #(
 typedef struct packed {
   qstage_data_t              in_data;
 
-  logic [D_CNT-1:0]          match_mask;
+  logic [MATCH_CELL_CNT-1:0]        match_mask;
 
-  logic [$clog2(D_CNT)-1:0]  match_num;
+  logic [MATCH_CELL_CNT_WIDTH-1:0]  match_num;
   logic                      got_match;
   
   logic [BYPASS_WIDTH-1:0]   bypass;
@@ -77,6 +78,9 @@ genvar g;
 generate
   for( g = 0; g < D_CNT; g++ )
     begin : mr
+      logic _ram_write_w;
+      assign _ram_write_w = ram_write_i && (g == ram_cell_i);
+
       simple_ram_with_delay #( 
         .DATA_WIDTH       ( RAM_DATA_WIDTH                              ), 
         .ADDR_WIDTH       ( RAM_ADDR_WIDTH                              ),
@@ -86,9 +90,9 @@ generate
         .clk_i            ( clk_i                                       ),
         .rst_i            ( rst_i                                       ),
 
-        .wr_addr_i        ( mm_ram_addr_i                               ),
-        .wr_data_i        ( mm_ram_data_i                               ),
-        .wr_enable_i      ( mm_ram_write_i                              ),
+        .wr_addr_i        ( ram_addr_i                                  ),
+        .wr_data_i        ( ram_data_i                                  ),
+        .wr_enable_i      ( _ram_write_w                                ),
 
         .in_read_addr_i   ( stage0_in.in_data.addr[RAM_ADDR_WIDTH-1:0]  ),
         .in_bypass_i      ( stage0_in                                   ),
