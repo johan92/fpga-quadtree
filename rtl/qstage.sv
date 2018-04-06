@@ -1,99 +1,187 @@
+module qstage #(
+  parameter ADDR_WIDTH     = 4,
+  parameter KEY_WIDTH      = 16,
+  parameter DATA_WIDTH     = 16,
+  parameter BYPASS_WIDTH   = 1,
+  
+  parameter RAM_ADDR_WIDTH = 1,
+
+  parameter RAM_OUT_REG_ENABLE    = 0,
+  parameter STAGE0_OUT_REG_ENABLE = 0,
+  parameter STAGE1_OUT_REG_ENABLE = 0,
+  
+  // internal parameter 
+  parameter RAM_DATA_WIDTH = KEY_WIDTH * 3
+) (
+  input                            clk_i,
+  input                            rst_i,
+
+  input     [RAM_DATA_WIDTH - 1:0] mm_ram_data_i,
+  input     [RAM_ADDR_WIDTH - 1:0] mm_ram_addr_i,
+  input                            mm_ram_write_i,
+  
+  input     [DATA_WIDTH     - 1:0] in_data_i,
+  input     [BYPASS_WIDTH   - 1:0] in_bypass_i,
+  input                            in_valid_i,
+  
+  output    [DATA_WIDTH     - 1:0] out_data_o,
+  output    [BYPASS_WIDTH   - 1:0] out_bypass_o,
+  output                           out_valid_o
+
+);
+
 `include "defs.vh"
 
-module qstage #( 
-  parameter IN_ADDR_WIDTH  = 4,
-  parameter OUT_ADDR_WIDTH = 6, 
-  parameter DATA_WIDTH     = 16
-) (
-  input                                 clk_i,
-  input                                 rst_i,
+typedef struct packed {
+  qstage_data_t              in_data;
 
-  qstage_ctrl_if                        ctrl_if,
-  
-  input                                 lookup_valid_i,
-  input          [IN_ADDR_WIDTH - 1:0]  lookup_addr_i,
-  input          [DATA_WIDTH    - 1:0]  lookup_data_i,
-  
-  output                                lookup_valid_o,
-  output         [OUT_ADDR_WIDTH - 1:0] lookup_addr_o,
-  output         [DATA_WIDTH     - 1:0] lookup_data_o
+  logic                      le_l;
+  logic                      le_m;
+  logic                      le_r;
 
-);
+  logic [1:0]                next_addr_postfix;
+  
+  logic [BYPASS_WIDTH-1:0]   bypass_data;
+} qstage_pipe_data_t;
 
 ram_data_t                rd_data_w;
+qstage_data_t             in_data;
 
-logic                     lookup_valid_d1;
-logic                     lookup_valid_d2;
+qstage_pipe_data_t        stage0_in;
+logic                     stage0_in_valid;
 
-logic [IN_ADDR_WIDTH-1:0] lookup_addr_d1;
-logic [IN_ADDR_WIDTH-1:0] lookup_addr_d2;
+qstage_pipe_data_t        stage0_out; 
+logic                     stage0_out_valid;
 
-logic [DATA_WIDTH-1:0]    lookup_data_d1;
-logic [DATA_WIDTH-1:0]    lookup_data_d2;
+qstage_pipe_data_t        stage1_in;
+logic                     stage1_in_valid;
 
-always_ff @( posedge clk_i or posedge rst_i )
-  if( rst_i  )
-    begin
-      lookup_valid_d1  <= 1'b0;
-      lookup_addr_d1   <= 'x;
-      lookup_data_d1   <= 'x;
+qstage_pipe_data_t        stage1_out; 
+logic                     stage1_out_valid;
 
-      lookup_valid_d2  <= 1'b0;
-      lookup_addr_d2   <= 'x;
-      lookup_data_d2   <= 'x;
-    end
-  else
-    begin
-      lookup_valid_d1  <= lookup_valid_i;
-      lookup_addr_d1   <= lookup_addr_i;
-      lookup_data_d1   <= lookup_data_i;
-      
-      lookup_valid_d2  <= lookup_valid_d1;   
-      lookup_addr_d2   <= lookup_addr_d1; 
-      lookup_data_d2   <= lookup_data_d1; 
-    end
+assign in_data = in_data_i; 
 
+//  --------------------------------------------------------------------------- 
+//  STAGE 0: Reading from RAM
+//  ---------------------------------------------------------------------------
+qstage_ram_data_t     ram_read_data;
+qstage_pipe_data_t    stage0_ram_out;
+logic                 stage0_ram_out_valid;
 
-simple_ram #( 
-  .DATA_WIDTH                             ( $bits(ram_data_t)                  ), 
-  .ADDR_WIDTH                             ( IN_ADDR_WIDTH                      )
-) tr_ram(
-  .clk                                    ( clk_i                              ),
+always_comb begin
+  stage0_in = 'x;
+  stage0_in_valid = in_valid_i;
 
-  .write_addr                             ( ctrl_if.wr_addr[IN_ADDR_WIDTH-1:0] ),
-  .data                                   ( ctrl_if.wr_data                    ),
-  .we                                     ( ctrl_if.wr_en                      ),
+  stage0_in.in_data = in_data;
+  stage0_in.bypass  = in_bypass_i;
+end
 
-  .read_addr                              ( lookup_addr_i                      ),
-  .q                                      ( rd_data_w                          )
+simple_ram_with_delay #( 
+  .DATA_WIDTH       ( RAM_DATA_WIDTH                              ), 
+  .ADDR_WIDTH       ( RAM_ADDR_WIDTH                              ),
+  .BYPASS_WIDTH     ( $bits(stage_0_in)                           ),
+  .OUT_REG_ENABLE   ( RAM_OUT_REG_ENABLE                          )
+) ram (
+  .clk_i            ( clk_i                                       ),
+  .rst_i            ( rst_i                                       ),
+
+  .wr_addr_i        ( mm_ram_addr_i                               ),
+  .wr_data_i        ( mm_ram_data_i                               ),
+  .wr_enable_i      ( mm_ram_write_i                              ),
+
+  .in_read_addr_i   ( stage0_in.in_data.addr[RAM_ADDR_WIDTH-1:0]  ),
+  .in_bypass_i      ( stage0_in                                   ),
+  .in_valid_i       ( stage0_in_valid                             ),
+
+  .out_read_data_o  ( ram_read_data                               ),
+  .out_bypass_o     ( stage0_ram_out                              ),
+  .out_valid_o      ( stage0_ram_out_valid                        )
 );
 
-// less or equal values l, m, r
-logic le_l;
-logic le_m;
-logic le_r;
+always_comb begin
+  stage0_out       = stage0_ram_out;
+  stage0_out_valid = stage0_ram_out_valid;
 
-assign le_l = ( lookup_data_d1 <= rd_data_w.l );
-assign le_m = ( lookup_data_d1 <= rd_data_w.m );
-assign le_r = ( lookup_data_d1 <= rd_data_w.r );
+  stage0_out.le_l  = (stage0_out.in_data.lookup_value <= ram_read_data.l);
+  stage0_out.le_m  = (stage0_out.in_data.lookup_value <= ram_read_data.m);
+  stage0_out.le_r  = (stage0_out.in_data.lookup_value <= ram_read_data.r);
+end
 
-//TODO: rename hdr
-logic [1:0] next_addr_hdr;
+delay #(
+  .DATA_WIDTH   ( $bits(stage0_out)        ),
+  .ENABLE       ( STAGE0_OUT_REG_ENABLE    )
+) delay_stage0 (
+  .clk_i        ( clk_i                    ),
+  .rst_i        ( rst_i                    ),
 
-always_ff @( posedge clk_i )
-  begin
-    casex( { le_l, le_m, le_r } )
-      3'b01x:  next_addr_hdr <= 'd1;
-      3'b001:  next_addr_hdr <= 'd2;
-      3'b000:  next_addr_hdr <= 'd3;
-      default: next_addr_hdr <= 'd0;
-    endcase
+  .in_data_i    ( stage0_out               ),
+  .in_valid_i   ( stage0_out_valid         ),
+
+  .out_data_o   ( stage1_in                ),
+  .out_valid_o  ( stage1_in_valid          )
+
+);
+
+//  --------------------------------------------------------------------------- 
+//  STAGE 1: Next addr postfix calculation 
+//  ---------------------------------------------------------------------------
+
+always_comb begin
+  stage1_out       = stage1_in;
+  stage1_out_valid = stage1_in_valid;
+
+  casex( { stage1_out.le_l, stage1_out.le_m, stage1_out.le_r } )
+      3'b01x:  stage1_out.next_addr_postfix = 'd1;
+      3'b001:  stage1_out.next_addr_postfix = 'd2;
+      3'b000:  stage1_out.next_addr_postfix = 'd3;
+      default: stage1_out.next_addr_postfix = 'd0;
+  endcase
+end
+
+delay #(
+  .DATA_WIDTH   ( $bits(stage1_out)        ),
+  .ENABLE       ( STAGE1_OUT_REG_ENABLE    )
+) delay_stage1 (
+  .clk_i        ( clk_i                    ),
+  .rst_i        ( rst_i                    ),
+
+  .in_data_i    ( stage1_out               ),
+  .in_valid_i   ( stage1_out_valid         ),
+
+  .out_data_o   ( stage2_in                ),
+  .out_valid_o  ( stage2_in_valid          )
+
+);
+
+//  --------------------------------------------------------------------------- 
+//  STAGE 2: Output "calculations"
+//  ---------------------------------------------------------------------------
+qstage_data_t            out_data;
+logic                    out_valid;
+logic [BYPASS_WIDTH-1:0] out_bypass;
+always_comb begin
+  out_data   = 'x;
+
+  out_valid  = stage2_in_valid;
+  out_bypass = stage2_in.bypass;
+
+  out_data.lookup_value = stage2_in.in_data.lookup_value;
+  out_data.addr         = ( RAM_ADDR_WIDTH == 1 ) ? (                        stage2_in.next_addr_postfix   ):
+                                                    ( { stage2.in_data.addr, stage2_in.next_addr_postfix } );
+end
+
+assign out_data_o   = out_data;
+assign out_valid_o  = out_valid;
+assign out_bypass_o = out_bypass;
+
+// synthesis translate_off
+initial begin
+  if( RAM_DATA_WIDTH != $bits(ram_data_t) ) begin
+    $error( "Data width mismatch RAM_DATA_WIDTH = %d $bits(ram_data_t) = %d",
+                                 RAM_DATA_WIDTH,     $bits(ram_data_t) );
+    $stop();                               
   end
-
-assign lookup_addr_o = ( IN_ADDR_WIDTH == 1 ) ? (                   next_addr_hdr   ):
-                                                ( { lookup_addr_d2, next_addr_hdr } );
-
-assign lookup_valid_o = lookup_valid_d2;
-assign lookup_data_o  = lookup_data_d2;
+end
+// synthesis translate_on
 
 endmodule

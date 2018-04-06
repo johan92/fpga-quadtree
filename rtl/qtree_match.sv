@@ -10,12 +10,14 @@ module qtree_match #(
 ) (
   input                         clk_i,
   input                         rst_i,
-
-  qstage_ctrl_if                ctrl_if,
-
-  input  [IN_ADDR_WIDTH  - 1:0] lookup_addr_i,
-  input  [DATA_WIDTH     - 1:0] lookup_data_i,
-  input                         lookup_valid_i,
+  
+  input  [RAM_DATA_WIDTH - 1:0] mm_ram_data_i,
+  input  [RAM_ADDR_WIDTH - 1:0] mm_ram_addr_i,
+  input                         mm_ram_write_i,
+  
+  input  [DATA_WIDTH     - 1:0] in_data_i,
+  input  [BYPASS_WIDTH   - 1:0] in_bypass_i,
+  input                         in_valid_i,
 
   output                        lookup_match_o,
   output [OUT_ADDR_WIDTH - 1:0] lookup_addr_o,
@@ -24,70 +26,113 @@ module qtree_match #(
 
 );
 
-localparam DELAY = 3;
+`include "defs.vh"
 
-logic [DELAY-1:0]                 lookup_valid_d;
-logic [DELAY-1:0][ADDR_WIDTH-1:0] lookup_addr_d;
-logic [DELAY-1:0][DATA_WIDTH-1:0] lookup_data_d;
+typedef struct packed {
+  qstage_data_t              in_data;
 
-genvar g;
+  logic [D_CNT-1:0]          match_mask;
 
-generate
-  for( g = 0; g < DELAY; g++ ) begin : g_delay
-    if( g == 0 ) begin
-
-      always_comb begin
-        lookup_addr_d  [0] = lookup_addr_i;
-        lookup_data_d  [0] = lookup_data_i;
-        lookup_valid_d [0] = lookup_valid_i;
-      end
-
-    end else begin
-
-      always_ff @( posedge clk_i or posedge rst_i )
-        if( rst_i ) begin
-          lookup_addr_d  [g] <= 'x;
-          lookup_data_d  [g] <= 'x;
-          lookup_valid_d [g] <= 1'b0;
-        end else begin
-          lookup_addr_d  [g] <= lookup_addr_d  [g - 1];
-          lookup_data_d  [g] <= lookup_data_d  [g - 1];
-          lookup_valid_d [g] <= lookup_valid_d [g - 1];
-        end
-
-    end
-  end
-endgenerate
+  logic [$clog2(D_CNT)-1:0]  match_num;
+  logic                      got_match;
+  
+  logic [BYPASS_WIDTH-1:0]   bypass;
+} match_pipe_data_t;
 
 match_ram_data_t          rd_data_w    [D_CNT-1:0];
-logic                     match        [D_CNT-1:0];
-logic                     got_match_w;
-logic                     got_match;
-logic [$clog2(D_CNT)-1:0] match_num_w;
-logic [$clog2(D_CNT)-1:0] match_num;
+
+qstage_data_t             in_data;
+
+match_pipe_data_t         stage0_in;
+logic                     stage0_in_valid;
+
+match_pipe_data_t         stage0_out;
+logic                     stage0_out_valid;
+
+match_pipe_data_t         stage1_in;
+logic                     stage1_in_valid;
+
+match_pipe_data_t         stage1_out;
+logic                     stage1_out_valid;
+
+assign in_data = in_data_i;
+
+//  --------------------------------------------------------------------------- 
+//  STAGE 0: Reading from RAM
+//  ---------------------------------------------------------------------------
+qstage_ram_data_t     ram_read_data  [D_CNT-1:0];
+qstage_pipe_data_t    stage0_ram_out [D_CNT-1:0];
+logic                 stage0_ram_out_valid;
+
+always_comb begin
+  stage0_in = 'x;
+  stage0_in_valid = in_valid_i;
+
+  stage0_in.in_data = in_data;
+  stage0_in.bypass  = in_bypass_i;
+end
+
 
 genvar g;
 generate
   for( g = 0; g < D_CNT; g++ )
     begin : mr
-      simple_ram #( 
-        .DATA_WIDTH        ( $bits(match_ram_data_t)                ), 
-        .ADDR_WIDTH        ( IN_ADDR_WIDTH                          )
-      ) tr_ram (
+      simple_ram_with_delay #( 
+        .DATA_WIDTH       ( RAM_DATA_WIDTH                              ), 
+        .ADDR_WIDTH       ( RAM_ADDR_WIDTH                              ),
+        .BYPASS_WIDTH     ( $bits(stage_0_in)                           ),
+        .OUT_REG_ENABLE   ( RAM_OUT_REG_ENABLE                          )
+      ) ram (
+        .clk_i            ( clk_i                                       ),
+        .rst_i            ( rst_i                                       ),
 
-        .clk               ( clk_i                                  ),
+        .wr_addr_i        ( mm_ram_addr_i                               ),
+        .wr_data_i        ( mm_ram_data_i                               ),
+        .wr_enable_i      ( mm_ram_write_i                              ),
 
-        .write_addr        ( ctrl_if.wr_addr[IN_ADDR_WIDTH-1:0]     ),
-        .data              ( ctrl_if.wr_data                        ),
-        .we                ( ctrl_if.wr_en && ctrl_if.mport[g].sel  ),
+        .in_read_addr_i   ( stage0_in.in_data.addr[RAM_ADDR_WIDTH-1:0]  ),
+        .in_bypass_i      ( stage0_in                                   ),
+        .in_valid_i       ( stage0_in_valid                             ),
 
-        .read_addr         ( lookup_addr_i                          ),
-        .q                 ( rd_data_w[g]                           )
+        .out_read_data_o  ( ram_read_data[g]                            ),
+        .out_bypass_o     ( stage0_ram_out[g]                           ),
+        .out_valid_o      ( stage0_ram_out_valid[g]                     )
       );
 
-      assign match[g] = ( rd_data_w[g].value == lookup_data_d1 ) && rd_data_w[g].en;
     end
 endgenerate
+
+always_comb begin
+  stage0_out       = stage0_ram_out[0];
+  stage0_out_valid = stage0_ram_out_valid;
+
+  for( int i = 0; i < D_CNT; i++ ) begin
+    stage0_out.match_mask[i]  = 1'b1;
+    stage0_out.match_mask[i] &= ram_read_data[i].l <=  stage0_ram_out[0].in_data.lookup_value;
+    stage0_out.match_mask[i] &= ram_read_data[i].r  => stage0_ram_out[0].in_data.lookup_value;
+  end
+end
+
+delay #(
+  .DATA_WIDTH   ( $bits(stage0_out)        ),
+  .ENABLE       ( STAGE0_OUT_REG_ENABLE    )
+) delay_stage0 (
+  .clk_i        ( clk_i                    ),
+  .rst_i        ( rst_i                    ),
+
+  .in_data_i    ( stage0_out               ),
+  .in_valid_i   ( stage0_out_valid         ),
+
+  .out_data_o   ( stage1_in                ),
+  .out_valid_o  ( stage1_in_valid          )
+
+);
+
+//  --------------------------------------------------------------------------- 
+//  STAGE 1: Match Num Calculation 
+//  ---------------------------------------------------------------------------
+logic [$clog2(D_CNT)-1:0] match_num_w;
+logic                     got_match_w;
 
 always_comb
   begin
@@ -96,7 +141,7 @@ always_comb
 
     for( int i = 0; i < D_CNT; i++ )
       begin
-        if( match[i] )
+        if( stage1_out.match_mask[i] )
           begin
             match_num_w = i;
             got_match_w = 1'b1;
@@ -104,11 +149,32 @@ always_comb
       end
   end
 
-always_ff @( posedge clk_i )
-  begin
-    match_num <= match_num_w;
-    got_match <= got_match_w;
-  end
+always_comb begin
+  stage1_out = stage1_in;
+  stage1_out_valid = stage1_in_valid;
+
+  stage1_out.match_num  = match_num_w;
+  stage1_out.got_match  = got_match_w; 
+end
+
+delay #(
+  .DATA_WIDTH   ( $bits(stage1_out)        ),
+  .ENABLE       ( STAGE1_OUT_REG_ENABLE    )
+) delay_stage1 (
+  .clk_i        ( clk_i                    ),
+  .rst_i        ( rst_i                    ),
+
+  .in_data_i    ( stage1_out               ),
+  .in_valid_i   ( stage1_out_valid         ),
+
+  .out_data_o   ( stage2_in                ),
+  .out_valid_o  ( stage2_in_valid          )
+
+);
+
+//  --------------------------------------------------------------------------- 
+//  STAGE 2: Output Calculations
+//  ---------------------------------------------------------------------------
 
 assign lookup_valid_o =   lookup_en_d2;
 assign lookup_match_o =   got_match; 

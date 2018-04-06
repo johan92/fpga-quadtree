@@ -1,69 +1,90 @@
 module qtree_top #( 
-  parameter STAGES         = 5,
-  parameter DATA_WIDTH     = 16,
+  parameter STAGES_CNT     = 5,
+  parameter KEY_WIDTH      = 16,
   parameter D_CNT          = 4,
+  parameter BYPASS_WIDTH   = 1,
   parameter OUT_ADDR_WIDTH = ( STAGES + 1 )*2 + $clog2( D_CNT )
 ) (
   input                                   clk_i,
   input                                   rst_i,
 
-  qstage_ctrl_if                          stages_ctrl_if,
-  qstage_ctrl_if                          match_ctrl_if,
-
+  input              [KEY_WIDTH-1:0]      lookup_data_i,
+  input              [BYPASS_WIDTH-1:0]   lookup_bypass_i,
   input                                   lookup_valid_i,
-  input              [DATA_WIDTH-1:0]     lookup_data_i,
   
   output                                  lookup_valid_o,
   output                                  lookup_match_o,
+  output             [BYPASS_WIDTH-1:0]   lookup_bypass_o,
   output             [OUT_ADDR_WIDTH-1:0] lookup_addr_o,
-  output             [DATA_WIDTH    -1:0] lookup_data_o
+  output             [KEY_WIDTH    -1:0]  lookup_data_o
 
 );
+
+`include "defs.vh"
+
+localparam QSTAGE_DATA_WIDTH = $bits(qstage_data_t);  
+
+logic [0:STAGES_CNT-1][QSTAGE_DATA_WIDTH-1:0] qstage_in_data_w;
+logic [0:STAGES_CNT-1][BYPASS_WIDTH-1:0]      qstage_in_bypass_w;
+logic [0:STAGES_CNT-1]                        qstage_in_valid_w;
+
+logic [0:STAGES_CNT-1][QSTAGE_DATA_WIDTH-1:0] qstage_out_data_w;
+logic [0:STAGES_CNT-1][BYPASS_WIDTH-1:0]      qstage_out_bypass_w;
+logic [0:STAGES_CNT-1]                        qstage_out_valid_w;
 
 genvar g;
 
 generate
   for( g = 0; g < STAGES; g++ )
     begin : tr
-      localparam _IN_ADDR_WIDTH      = ( g == 0 ) ? ( 1 ) : ( g * 2        );
-      localparam _NEXT_ADDR_WIDTH = ( g == 0 ) ? ( 2 ) : ( _A_WIDTH + 2 );
+      localparam _IN_ADDR_WIDTH = ( g == 0 ) ? ( 1 ) : ( g * 2        );
 
-      logic                        _lookup_valid_w;
-      logic [_ADDR_WIDTH-1:0]      _lookup_addr_w;
-      logic [DATA_WIDTH-1:0]       _lookup_data_w;
+      if( g == 0 ) begin : g_first_stage
+        qstage_data_t _qstage_data;
+        
+        always_comb begin
+          _qstage_data = 'x;
+          _qstage_data.addr = '0;
+          _qstage_data.lookup_value = lookup_data_i;
+        end
+        
+        assign qstage_in_data_w   [g] = _qstage_data; 
+        assign qstage_in_bypass_w [g] = lookup_bypass_i; 
+        assign qstage_in_valid_w  [g] = lookup_valid_i;
 
-      logic                        _next_lookup_valid_w;
-      logic [_NEXT_ADDR_WIDTH-1:0] _next_lookup_addr_w;
-      logic [DATA_WIDTH-1:0]       _next_lookup_data_w;
-
-      if( g == 0 ) begin
-        assign _lookup_addr_w  = '0;
-        assign _lookup_data_w  = lookup_data_i;
-        assign _lookup_valid_w = lookup_valid_i;
-      end else begin
-        assign _lookup_addr_w  = tr[g-1]._next_lookup_addr_w; 
-        assign _lookup_data_w  = tr[g-1]._next_lookup_data_w; 
-        assign _lookup_valid_w = tr[g-1]._next_lookup_valid_w; 
+      end else begin : other_stages
+        assign qstage_in_data_w   [g] = qstage_out_data_w  [g-1]; 
+        assign qstage_in_bypass_w [g] = qstage_out_bypass_w[g-1]; 
+        assign qstage_in_valid_w  [g] = qstage_out_valid_w [g-1];
       end
       
       qstage #( 
-        .IN_ADDR_WIDTH        ( _ADDR_WIDTH                 ),
-        .OUT_ADDR_WIDTH       ( _NEXT_ADDR_WIDTH            ),
-        .DATA_WIDTH           ( DATA_WIDTH                  )
+        .ADDR_WIDTH             ( OUT_ADDR_WIDTH    ),  
+        .KEY_WIDTH              ( KEY_WIDTH         ),  
+        .DATA_WIDTH             ( QSTAGE_DATA_WIDTH ),  
+        .BYPASS_WIDTH           ( BYPASS_WIDTH      ),  
+                                     
+        .RAM_ADDR_WIDTH         ( _IN_ADDR_WIDTH    ),  
+                                     
+        .RAM_OUT_REG_ENABLE     ( 0                 ),  
+        .STAGE0_OUT_REG_ENABLE  ( 0                 ),  
+        .STAGE1_OUT_REG_ENABLE  ( 0                 )   
       ) qs (
 
-        .clk_i                ( clk_i                       ),
-        .rst_i                ( rst_i                       ),
+        .clk_i                  ( clk_i                   ),
+        .rst_i                  ( rst_i                   ),
 
-        .ctrl_if              ( stages_ctrl_if.mport[g].app ),
+        .mm_ram_data_i          ( mm_ram_data_i           ),
+        .mm_ram_addr_i          ( mm_ram_addr_i           ),
+        .mm_ram_write_i         ( mm_ram_write_i          ),
           
-        .lookup_addr_i        ( _lookup_addr_w              ),
-        .lookup_data_i        ( _lookup_data_w              ),
-        .lookup_valid_i       ( _lookup_valid_w             ),
+        .in_data_i              ( qstage_in_data_w    [g] ),
+        .in_bypass_i            ( qstage_in_bypass_w  [g] ),
+        .in_valid_i             ( qstage_in_valid_w   [g] ),
           
-        .lookup_addr_o        ( _next_lookup_addr_w         ),
-        .lookup_data_o        ( _next_lookup_data_w         ),
-        .lookup_valid_o       ( _next_lookup_valid_w        )
+        .out_data_o             ( qstage_out_data_w   [g] ),
+        .out_bypass_o           ( qstage_out_bypass_w [g] ),
+        .out_valid_o            ( qstage_out_valid_w  [g] )
 
       );
     end

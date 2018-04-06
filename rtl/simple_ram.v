@@ -4,8 +4,7 @@
 
 module simple_ram #(
   parameter DATA_WIDTH = 8, 
-  parameter ADDR_WIDTH = 6,
-  parameter OUT_REG_EN = 0
+  parameter ADDR_WIDTH = 6
 ) (
   input                     clk,
  
@@ -20,7 +19,6 @@ module simple_ram #(
   // Declare the RAM variable
   reg [DATA_WIDTH-1:0] ram[2**ADDR_WIDTH-1:0];
   reg [DATA_WIDTH-1:0] read_data;
-  reg [DATA_WIDTH-1:0] read_data_d1;
 
   always @ (posedge clk) begin
     // Write
@@ -34,11 +32,6 @@ module simple_ram #(
     read_data <= ram[read_addr];
   end
 
-  always @ (posedge clk) begin
-    read_data_d1 <= read_data;
-  end
-
-  assign q = (OUT_REG_EN) ? (read_data_d1):
-                            (read_data   );
+  assign q = read_data;
 
 endmodule
