@@ -28,10 +28,10 @@ endfunction
 function automatic string match_ram_mm_cmd2str(input match_ram_mm_cmd_t _d);
   string s = "";
 
-  $sformat( "%s addr.ram_addr = %d", s, _d.addr.ram_addr );
-  $sformat( "%s addr.cell_num = %d", s, _d.addr.cell_num );
-  $sformat( "%s data.l = %d",        s, _d.data.l        );
-  $sformat( "%s data.r = %d",        s, _d.data.r        );
+  $sformat( s, "%s addr.ram_addr = %d", s, _d.addr.ram_addr );
+  $sformat( s, "%s addr.cell_num = %d", s, _d.addr.cell_num );
+  $sformat( s, "%s data.l = %d",        s, _d.data.l        );
+  $sformat( s, "%s data.r = %d",        s, _d.data.r        );
 
   return s;
 endfunction
@@ -63,11 +63,10 @@ class MatchRamData;
     
     while( 1 )
       begin
-        code = $fscanf( fd, "%d %d %d %d %d ", _cmd.addr.ram_addr, 
-                                               _cmd.addr.cell_num, 
-                                               _cmd.data.l, 
-                                               _cmd.data.m, 
-                                               _cmd.data.r );
+        code = $fscanf( fd, "%d %d %d %d ", _cmd.addr.ram_addr, 
+                                            _cmd.addr.cell_num, 
+                                            _cmd.data.l, 
+                                            _cmd.data.r );
 
         if( code <= 0 )
           begin
@@ -145,7 +144,7 @@ class Segments;
 
         $display( "%t: %m: %s", $time(), segment2str(_s));
 
-        q.push_back(_s)
+        q.push_back(_s);
       end
 
   endfunction

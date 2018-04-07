@@ -57,7 +57,7 @@ delay #(
 delay #(
   .DATA_WIDTH   ( DATA_WIDTH + BYPASS_WIDTH            ),
   .ENABLE       ( OUT_REG_ENABLE                       )
-) delay_d1 (
+) delay_out (
   .clk_i        ( clk_i                                ),
   .rst_i        ( rst_i                                ),
 

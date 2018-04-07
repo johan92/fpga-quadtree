@@ -31,6 +31,7 @@ module qtree_level #(
 );
 
 `include "defs.vh"
+`include "ram_defs.vh"
 
 typedef struct packed {
   level_data_t              in_data;
@@ -168,8 +169,8 @@ always_comb begin
   out_bypass = stage2_in.bypass;
 
   out_data.lookup_value = stage2_in.in_data.lookup_value;
-  out_data.addr         = ( RAM_ADDR_WIDTH == 1 ) ? (                        stage2_in.next_addr_postfix   ):
-                                                    ( { stage2.in_data.addr, stage2_in.next_addr_postfix } );
+  out_data.addr         = ( RAM_ADDR_WIDTH == 1 ) ? (                           stage2_in.next_addr_postfix   ):
+                                                    ( { stage2_in.in_data.addr, stage2_in.next_addr_postfix } );
 end
 
 assign out_data_o   = out_data;

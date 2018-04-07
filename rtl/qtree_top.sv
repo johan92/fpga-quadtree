@@ -1,16 +1,22 @@
 module qtree_top #( 
-  parameter LEVEL_CNT      = 5,
-  parameter LEVEL_WIDTH    = $clog2(LEVEL_CNT),
-  parameter KEY_WIDTH      = 16,
-  parameter MATCH_CELL_CNT = 4,
+  // main "global" defines
+  parameter LEVEL_CNT            = 5,
+  parameter KEY_WIDTH            = 16,
+  parameter MATCH_CELL_CNT       = 4,
+  parameter BYPASS_WIDTH         = 1,
+  
+  // other defines. recalculated from global
+  parameter LEVEL_WIDTH          = -1,
   parameter MATCH_CELL_CNT_WIDTH = -1,
   
-  parameter ADDR_WIDTH     = -1, 
-
-  parameter BYPASS_WIDTH   = 1,
+  parameter ADDR_WIDTH           = -1, 
   
-  parameter MM_ADDR_WIDTH  = 8,
-  parameter MM_DATA_WIDTH  = 128
+  parameter MM_ADDR_WIDTH        = -1,
+  parameter MM_DATA_WIDTH        = -1,
+
+  parameter LEVEL_RAM_DATA_WIDTH = -1,
+  parameter MATCH_RAM_DATA_WIDTH = -1,
+  parameter MATCH_RAM_ADDR_WIDTH = -1
 
 ) (
   input                            clk_i,
@@ -30,10 +36,6 @@ module qtree_top #(
   output    [ADDR_WIDTH  -1:0]     lookup_addr_o
 
 );
-
-`include "func_defs.vh"
-
-localparam LAST_STAGE_ADDR_WIDTH = get_level_ram_width(LEVEL_CNT-1); 
 
 `include "mm_defs.vh"
 `include "defs.vh"
@@ -91,12 +93,13 @@ generate
       assign _mm_write = mm_ctrl_write_i && (is_mm_addr_level) && (g == mm_addr_level.level_num);
       
       qtree_level #( 
-        .ADDR_WIDTH             ( OUT_ADDR_WIDTH    ),  
+        .ADDR_WIDTH             ( ADDR_WIDTH        ),  
         .KEY_WIDTH              ( KEY_WIDTH         ),  
         .DATA_WIDTH             ( LEVEL_DATA_WIDTH  ),  
         .BYPASS_WIDTH           ( BYPASS_WIDTH      ),  
                                      
-        .RAM_ADDR_WIDTH         ( _RAM_ADDR_WIDTH   ),  
+        .RAM_ADDR_WIDTH         ( _RAM_ADDR_WIDTH   ), 
+        .RAM_DATA_WIDTH         ( LEVEL_RAM_DATA_WIDTH ),
                                      
         .RAM_OUT_REG_ENABLE     ( 0                 ),  
         .STAGE0_OUT_REG_ENABLE  ( 0                 ),  
@@ -130,20 +133,20 @@ assign ram_match_write = is_mm_addr_match && mm_ctrl_write_i;
 qtree_match #( 
   .ADDR_WIDTH                            ( ADDR_WIDTH              ), 
                                                                     
-  .IN_DATA_WIDTH                         ( IN_DATA_WIDTH           ),
+  .IN_DATA_WIDTH                         ( LEVEL_DATA_WIDTH        ),
   .KEY_WIDTH                             ( KEY_WIDTH               ),
                                                                     
   .BYPASS_WIDTH                          ( BYPASS_WIDTH            ),
                                                                     
-  .RAM_DATA_WIDTH                        ( RAM_DATA_WIDTH          ),
-  .RAM_ADDR_WIDTH                        ( RAM_ADDR_WIDTH          ),
+  .RAM_DATA_WIDTH                        ( MATCH_RAM_DATA_WIDTH    ),
+  .RAM_ADDR_WIDTH                        ( MATCH_RAM_ADDR_WIDTH    ),
                                                                 
   .MATCH_CELL_CNT                        ( MATCH_CELL_CNT          ),
   .MATCH_CELL_CNT_WIDTH                  ( MATCH_CELL_CNT_WIDTH    ),
                                                                 
-  .RAM_OUT_REG_ENABLE                    ( RAM_OUT_REG_ENABLE      ),
-  .STAGE0_OUT_REG_ENABLE                 ( STAGE0_OUT_REG_ENABLE   ),
-  .STAGE1_OUT_REG_ENABLE                 ( STAGE1_OUT_REG_ENABLE   )
+  .RAM_OUT_REG_ENABLE                    ( 0                       ),
+  .STAGE0_OUT_REG_ENABLE                 ( 0                       ),
+  .STAGE1_OUT_REG_ENABLE                 ( 0                       )
 
 ) match (
   .clk_i                                 ( clk_i                   ),
@@ -154,15 +157,36 @@ qtree_match #(
   .ram_cell_i                            ( mm_addr_match.cell_num  ),
   .ram_write_i                           ( ram_match_write         ),
 
-  .lookup_addr_i                         ( lookup_addr_i           ),
-  .lookup_data_i                         ( lookup_data_i           ),
-  .lookup_valid_i                        ( lookup_valid_i          ),
+  .in_data_i                             ( level_out_data_w   [LEVEL_CNT-1] ),
+  .in_bypass_i                           ( level_out_bypass_w [LEVEL_CNT-1] ),
+  .in_valid_i                            ( level_out_valid_w  [LEVEL_CNT-1] ),
 
-  .lookup_done_o                         ( lookup_done_o           ),
   .lookup_match_o                        ( lookup_match_o          ),
   .lookup_addr_o                         ( lookup_addr_o           ),
-  .lookup_data_o                         ( lookup_data_o           )
+  .lookup_bypass_o                       ( lookup_bypass_o         ),
+  .lookup_valid_o                        ( lookup_valid_o          )
 
 );
+
+// synthesis translate_off
+function automatic display_parameters();
+  $display("%t: %m: LEVEL_CNT            = %d", $time(), LEVEL_CNT             ); 
+  $display("%t: %m: KEY_WIDTH            = %d", $time(), KEY_WIDTH             );
+  $display("%t: %m: MATCH_CELL_CNT       = %d", $time(), MATCH_CELL_CNT        );
+  $display("%t: %m: BYPASS_WIDTH         = %d", $time(), BYPASS_WIDTH          );
+  $display("%t: %m: LEVEL_WIDTH          = %d", $time(), LEVEL_WIDTH           );
+  $display("%t: %m: MATCH_CELL_CNT_WIDTH = %d", $time(), MATCH_CELL_CNT_WIDTH  );
+  $display("%t: %m: ADDR_WIDTH           = %d", $time(), ADDR_WIDTH            );
+  $display("%t: %m: MM_ADDR_WIDTH        = %d", $time(), MM_ADDR_WIDTH         );
+  $display("%t: %m: MM_DATA_WIDTH        = %d", $time(), MM_DATA_WIDTH         );
+  $display("%t: %m: LEVEL_RAM_DATA_WIDTH = %d", $time(), LEVEL_RAM_DATA_WIDTH  );
+  $display("%t: %m: MATCH_RAM_DATA_WIDTH = %d", $time(), MATCH_RAM_DATA_WIDTH  );
+  $display("%t: %m: MATCH_RAM_ADDR_WIDTH = %d", $time(), MATCH_RAM_ADDR_WIDTH  );
+endfunction
+
+initial begin
+  display_parameters();
+end
+// synthesis translate_on
 
 endmodule

@@ -1,32 +1,47 @@
 module top_tb;
+
+// main "global" quad tree defines
 localparam LEVEL_CNT      = 5;
 localparam KEY_WIDTH      = 16;
 localparam MATCH_CELL_CNT = 4;
-
 localparam BYPASS_WIDTH   = 1;
+
+`include "func_defs.vh"
+`include "ram_defs.vh"
+
+// other defines, recalculated from "global"
+localparam ADDR_WIDTH           = get_ADDR_WIDTH          ( LEVEL_CNT, MATCH_CELL_CNT );
+
+localparam LEVEL_WIDTH          = get_LEVEL_WIDTH         ( LEVEL_CNT      );
+localparam MATCH_CELL_CNT_WIDTH = get_MATCH_CELL_CNT_WIDTH( MATCH_CELL_CNT );
+
+localparam LEVEL_RAM_DATA_WIDTH = $bits(level_ram_data_t);
+localparam MATCH_RAM_DATA_WIDTH = $bits(match_ram_data_t);
+localparam MATCH_RAM_ADDR_WIDTH = get_MATCH_RAM_ADDR_WIDTH( LEVEL_CNT );
+
+`include "mm_defs.vh"
+
+localparam MM_ADDR_WIDTH = get_MM_ADDR_WIDTH( $bits(mm_addr_level_t), $bits(mm_addr_match_t) );
+localparam MM_DATA_WIDTH = get_MM_DATA_WIDTH( LEVEL_RAM_DATA_WIDTH, MATCH_RAM_DATA_WIDTH     );
 
 `include "defs.vh"
 `include "tb_defs.vh"
 
-logic clk;
-logic rst;
+bit clk;
+bit rst;
+bit rst_done;
+
+always #5ns clk = ~clk;
 
 initial
   begin
-    clk = 1'b0;
-    forever 
-      begin
-        #5.0ns clk = ~clk;
-      end
-  end
+    rst <= 1'b1;
+    @(posedge clk);
+    @(posedge clk);
+    @(negedge clk);
+    rst <= 1'b0;
 
-initial
-  begin
-    rst = 1'b0;
-    #2.0ns 
-    rst = 1'b1;
-    #5.0ns
-    rst = 1'b0;
+    rst_done = 1'b1;
   end
 
 
@@ -49,7 +64,7 @@ initial
 //  ST BFM 
 //  ---------------------------------------------------------------------------
 
-localparam ST_BFM_DATA_WIDTH = 32;
+localparam ST_BFM_DATA_WIDTH = KEY_WIDTH;
 
 logic [ST_BFM_DATA_WIDTH-1:0] st_bfm_data;
 logic                         st_bfm_valid;
@@ -106,9 +121,6 @@ endtask
 //  --------------------------------------------------------------------------- 
 //  MM 
 //  ---------------------------------------------------------------------------
-localparam MM_ADDR_WIDTH = ( $bits(mm_addr_level_t) > $bits(mm_addr_match_t) ) ? ( $bits(mm_addr_level_t) + 1 ):
-                                                                                 ( $bits(mm_addr_match_t) + 1 );
-localparam MM_DATA_WIDTH = 128;
 
 logic [MM_ADDR_WIDTH-1:0] mm_ctrl_addr;
 logic [MM_DATA_WIDTH-1:0] mm_ctrl_data;
@@ -121,7 +133,7 @@ task automatic ctrl_level_ram();
     mm_ctrl_addr <= level_ram_data.cmds[i].addr;
     mm_ctrl_addr[MM_ADDR_WIDTH-1] <= 1'b0;
     
-    mm_ctrl_data  <= level_ram_data.cmds[i].data
+    mm_ctrl_data  <= level_ram_data.cmds[i].data;
     mm_ctrl_write <= 1'b0;
     
     @(posedge clk);
@@ -139,7 +151,7 @@ task automatic ctrl_match_ram();
     mm_ctrl_addr <= match_ram_data.cmds[i].addr;
     mm_ctrl_addr[MM_ADDR_WIDTH-1] <= 1'b1;
     
-    mm_ctrl_data  <= match_ram_data.cmds[i].data
+    mm_ctrl_data  <= match_ram_data.cmds[i].data;
     mm_ctrl_write <= 1'b0;
     
     @(posedge clk);
@@ -158,14 +170,19 @@ initial begin
 end
 
 qtree_top #( 
-  .LEVEL_CNT                              ( LEVEL_CNT         ),
-  .KEY_WIDTH                              ( KEY_WIDTH         ),
-  .MATCH_CELL_CNT                         ( MATCH_CELL_CNT    ),
-
-  .BYPASS_WIDTH                           ( BYPASS_WIDTH      ),
-  
-  .MM_ADDR_WIDTH                          ( MM_ADDR_WIDTH     ),
-  .MM_DATA_WIDTH                          ( MM_DATA_WIDTH     )
+  .LEVEL_CNT                              ( LEVEL_CNT             ), 
+  .KEY_WIDTH                              ( KEY_WIDTH             ),
+  .MATCH_CELL_CNT                         ( MATCH_CELL_CNT        ),
+  .BYPASS_WIDTH                           ( BYPASS_WIDTH          ),
+                                                                
+  .LEVEL_WIDTH                            ( LEVEL_WIDTH           ),
+  .MATCH_CELL_CNT_WIDTH                   ( MATCH_CELL_CNT_WIDTH  ),
+  .ADDR_WIDTH                             ( ADDR_WIDTH            ),
+  .MM_ADDR_WIDTH                          ( MM_ADDR_WIDTH         ),
+  .MM_DATA_WIDTH                          ( MM_DATA_WIDTH         ),
+  .LEVEL_RAM_DATA_WIDTH                   ( LEVEL_RAM_DATA_WIDTH  ),
+  .MATCH_RAM_DATA_WIDTH                   ( MATCH_RAM_DATA_WIDTH  ),
+  .MATCH_RAM_ADDR_WIDTH                   ( MATCH_RAM_ADDR_WIDTH  )
 ) dut (
   .clk_i                                  ( clk               ),
   .rst_i                                  ( rst               ),

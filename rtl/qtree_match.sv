@@ -37,6 +37,7 @@ module qtree_match #(
 );
 
 `include "defs.vh"
+`include "ram_defs.vh"
 
 typedef struct packed {
   level_data_t                      in_data;
