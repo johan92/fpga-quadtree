@@ -13,6 +13,8 @@ typedef struct packed {
   logic [KEY_WIDTH-1:0] r;
 } segment_t;
 
+typedef logic [KEY_WIDTH-1:0] lookup_data_t;
+
 function automatic string level_ram_mm_cmd2str(input level_ram_mm_cmd_t _d);
   string s = "";
 
@@ -41,6 +43,14 @@ function automatic string segment2str(input segment_t _d);
   
   $sformat(s, "%s l = %d", s, _d.l);
   $sformat(s, "%s r = %d", s, _d.r);
+
+  return s;
+endfunction
+
+function automatic string lookup_data2str(input lookup_data_t _d);
+  string s = "";
+
+  $sformat(s, "%s %d", s, _d);
 
   return s;
 endfunction
@@ -99,9 +109,10 @@ class LevelRamData;
     
     while( 1 )
       begin
-        code = $fscanf( fd, "%d %d %d %d ", _cmd.addr.level_num, 
+        code = $fscanf( fd, "%d %d %d %d %d ", _cmd.addr.level_num, 
                                             _cmd.addr.ram_addr, 
                                             _cmd.data.l, 
+                                            _cmd.data.m,
                                             _cmd.data.r );
 
         if( code <= 0 )
@@ -159,4 +170,35 @@ class Segments;
     return -1;
   endfunction
 
+endclass
+
+class LookupData;
+
+  lookup_data_t q[$];
+  
+  function new();
+    q = {};
+  endfunction
+
+  function void load(input string fname);
+    integer fd;
+    integer code;
+
+    lookup_data_t _d;
+
+    fd = $fopen( fname, "r" );
+
+    while( 1 ) begin
+        code = $fscanf( fd, "%d ", _d );
+
+        if( code <= 0 )
+          begin
+            return;
+          end
+
+        $display( "%t: %m: %s", $time(), lookup_data2str(_d));
+
+        q.push_back(_d);
+    end
+  endfunction
 endclass

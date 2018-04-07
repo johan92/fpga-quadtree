@@ -30,6 +30,7 @@ localparam MM_DATA_WIDTH = get_MM_DATA_WIDTH( LEVEL_RAM_DATA_WIDTH, MATCH_RAM_DA
 bit clk;
 bit rst;
 bit rst_done;
+bit ctrl_done;
 
 always #5ns clk = ~clk;
 
@@ -44,20 +45,22 @@ initial
     rst_done = 1'b1;
   end
 
-
 Segments     segments;
 LevelRamData level_ram_data;
 MatchRamData match_ram_data;
+LookupData   lookup_data;
 
 initial
   begin
     segments       = new();
     level_ram_data = new();
     match_ram_data = new();
+    lookup_data    = new();
 
-    segments.load      ("./test_cases/test_01_segments" );
-    level_ram_data.load("./test_cases/test_01_level_ram");
-    match_ram_data.load("./test_cases/test_01_match_ram");
+    segments.load      ("./test_cases/test_01_segments"   );
+    level_ram_data.load("./test_cases/test_01_level_ram"  );
+    match_ram_data.load("./test_cases/test_01_match_ram"  );
+    lookup_data.load   ("./test_cases/test_01_lookup_data");
   end
 
 //  --------------------------------------------------------------------------- 
@@ -105,7 +108,7 @@ altera_avalon_st_source_bfm #(
 
 assign st_bfm_ready = 1'b1;
 
-task automatic st_bfm_send( logic [31:0] _data );
+task automatic st_bfm_send( logic [KEY_WIDTH-1:0] _data );
    while( st_bfm.get_transaction_queue_size() > 0 ) begin
      @( st_bfm.signal_src_driving_transaction );
    end
@@ -117,6 +120,17 @@ task automatic st_bfm_send( logic [31:0] _data );
    st_bfm.set_transaction_data( _data );
    st_bfm.push_transaction();
 endtask
+
+initial begin
+  wait(ctrl_done);
+
+  foreach(lookup_data.q[i]) begin
+    st_bfm_send(lookup_data.q[i]);
+  end
+
+  repeat(100) @(posedge clk);
+  $stop();
+end
 
 //  --------------------------------------------------------------------------- 
 //  MM 
@@ -162,11 +176,17 @@ task automatic ctrl_match_ram();
   end
 endtask
 
-initial begin
-  wait(rst_done);
-
+task automatic do_ctrl();
   ctrl_level_ram();
   ctrl_match_ram();
+
+  ctrl_done = 1'b1;
+  $display("%t: %m: done", $time());
+endtask
+
+initial begin
+  wait(rst_done);
+  do_ctrl();
 end
 
 qtree_top #( 
