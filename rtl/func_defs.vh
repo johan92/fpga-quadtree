@@ -21,7 +21,7 @@ function automatic int get_level_mm_ctrl_width(int level_cnt);
 
   level_cnt_clog2 = (level_cnt == 1) ? (1) : ($clog2(level_cnt));
 
-  return last_level_ram_addr_width + level_cnt_clog2;,
+  return last_level_ram_addr_width + level_cnt_clog2;
 
 endfunction
 

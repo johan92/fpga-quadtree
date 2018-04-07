@@ -1,14 +1,17 @@
 module qtree_top #( 
   parameter LEVEL_CNT      = 5,
+  parameter LEVEL_WIDTH    = $clog2(LEVEL_CNT),
   parameter KEY_WIDTH      = 16,
   parameter MATCH_CELL_CNT = 4,
+  parameter MATCH_CELL_CNT_WIDTH = -1,
+  
+  parameter ADDR_WIDTH     = -1, 
 
   parameter BYPASS_WIDTH   = 1,
   
   parameter MM_ADDR_WIDTH  = 8,
-  parameter MM_DATA_WIDTH  = 128,
+  parameter MM_DATA_WIDTH  = 128
 
-  parameter OUT_ADDR_WIDTH = ( STAGES + 1 )*2 + $clog2( D_CNT )
 ) (
   input                            clk_i,
   input                            rst_i,
@@ -24,10 +27,15 @@ module qtree_top #(
   output                           lookup_valid_o,
   output                           lookup_match_o,
   output    [BYPASS_WIDTH-1:0]     lookup_bypass_o,
-  output    [OUT_ADDR_WIDTH-1:0]   lookup_addr_o,
+  output    [ADDR_WIDTH  -1:0]     lookup_addr_o
 
 );
 
+`include "func_defs.vh"
+
+localparam LAST_STAGE_ADDR_WIDTH = get_level_ram_width(LEVEL_CNT-1); 
+
+`include "mm_defs.vh"
 `include "defs.vh"
 
 localparam LEVEL_DATA_WIDTH = $bits(level_data_t);  
@@ -120,10 +128,23 @@ logic ram_match_write;
 assign ram_match_write = is_mm_addr_match && mm_ctrl_write_i;
 
 qtree_match #( 
-  .IN_ADDR_WIDTH                         ( IN_ADDR_WIDTH           ),
-  .OUT_ADDR_WIDTH                        ( OUT_ADDR_WIDTH          ), 
-  .DATA_WIDTH                            ( DATA_WIDTH              ),
-  .D_CNT                                 ( D_CNT                   )
+  .ADDR_WIDTH                            ( ADDR_WIDTH              ), 
+                                                                    
+  .IN_DATA_WIDTH                         ( IN_DATA_WIDTH           ),
+  .KEY_WIDTH                             ( KEY_WIDTH               ),
+                                                                    
+  .BYPASS_WIDTH                          ( BYPASS_WIDTH            ),
+                                                                    
+  .RAM_DATA_WIDTH                        ( RAM_DATA_WIDTH          ),
+  .RAM_ADDR_WIDTH                        ( RAM_ADDR_WIDTH          ),
+                                                                
+  .MATCH_CELL_CNT                        ( MATCH_CELL_CNT          ),
+  .MATCH_CELL_CNT_WIDTH                  ( MATCH_CELL_CNT_WIDTH    ),
+                                                                
+  .RAM_OUT_REG_ENABLE                    ( RAM_OUT_REG_ENABLE      ),
+  .STAGE0_OUT_REG_ENABLE                 ( STAGE0_OUT_REG_ENABLE   ),
+  .STAGE1_OUT_REG_ENABLE                 ( STAGE1_OUT_REG_ENABLE   )
+
 ) match (
   .clk_i                                 ( clk_i                   ),
   .rst_i                                 ( rst_i                   ),

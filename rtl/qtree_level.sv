@@ -41,7 +41,7 @@ typedef struct packed {
 
   logic [1:0]               next_addr_postfix;
   
-  logic [BYPASS_WIDTH-1:0]  bypass_data;
+  logic [BYPASS_WIDTH-1:0]  bypass;
 } level_pipe_data_t;
 
 level_data_t             in_data;
@@ -57,6 +57,9 @@ logic                    stage1_in_valid;
 
 level_pipe_data_t        stage1_out; 
 logic                    stage1_out_valid;
+
+level_pipe_data_t        stage2_in; 
+logic                    stage2_in_valid;
 
 assign in_data = in_data_i; 
 
@@ -175,9 +178,9 @@ assign out_bypass_o = out_bypass;
 
 // synthesis translate_off
 initial begin
-  if( RAM_DATA_WIDTH != $bits(ram_data_t) ) begin
-    $error( "Data width mismatch RAM_DATA_WIDTH = %d $bits(ram_data_t) = %d",
-                                 RAM_DATA_WIDTH,     $bits(ram_data_t) );
+  if( RAM_DATA_WIDTH != $bits(level_ram_data_t) ) begin
+    $error( "Data width mismatch RAM_DATA_WIDTH = %d $bits(level_ram_data_t) = %d",
+                                 RAM_DATA_WIDTH,     $bits(level_ram_data_t) );
     $stop();                               
   end
 end

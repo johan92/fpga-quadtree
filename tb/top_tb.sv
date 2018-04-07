@@ -36,13 +36,13 @@ MatchRamData match_ram_data;
 
 initial
   begin
-    segments = new();
+    segments       = new();
     level_ram_data = new();
     match_ram_data = new();
 
-    segments.load("in_segments");
-    level_ram_data.load("in_segments_stage_ram");
-    match_ram_data.load("in_segments_match_ram");
+    segments.load      ("./test_cases/test_01_segments" );
+    level_ram_data.load("./test_cases/test_01_level_ram");
+    match_ram_data.load("./test_cases/test_01_match_ram");
   end
 
 //  --------------------------------------------------------------------------- 
