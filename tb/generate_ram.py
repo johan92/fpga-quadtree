@@ -53,17 +53,17 @@ class QTreeRamGenerator():
     MIN_VALUE = 0
     MAX_VALUE = pow(2,8) - 1
 
-    def __init__(self, stages, d_cnt, segments):
-        self.stages = stages
-        self.d_cnt = d_cnt
+    def __init__(self, levels, cell_cnt, segments):
+        self.levels = levels
+        self.cell_cnt = cell_cnt
         self.segments = segments
 
-        self.LAST_TABLE_ADDR_CNT = pow(4, self.stages) 
-        self.MAX_HOLD_DATA_CNT   = self.LAST_TABLE_ADDR_CNT * self.d_cnt
+        self.LAST_TABLE_ADDR_CNT = pow(4, self.levels) 
+        self.MAX_HOLD_DATA_CNT   = self.LAST_TABLE_ADDR_CNT * self.cell_cnt
 
         self.check_segments()
         self.create_match_ram()
-        self.create_stages_ram()
+        self.create_levels_ram()
     
     def check_value(self, v):
         good = True
@@ -78,31 +78,31 @@ class QTreeRamGenerator():
 
         assert(len(self.segments.array) <= self.MAX_HOLD_DATA_CNT)
     
-    def prepare_stages_ram(self):
-        self.stages_ram = []
+    def prepare_levels_ram(self):
+        self.levels_ram = []
 
-        for i in xrange(self.stages):
-            self.stages_ram.append(list())
+        for i in xrange(self.levels):
+            self.levels_ram.append(list())
 
             for j in xrange(pow(4,i)):
-                self.stages_ram[i].append( [self.MAX_VALUE, self.MAX_VALUE, self.MAX_VALUE])
+                self.levels_ram[i].append( [self.MAX_VALUE, self.MAX_VALUE, self.MAX_VALUE])
 
-    def create_stages_ram(self):
-        self.prepare_stages_ram()
+    def create_levels_ram(self):
+        self.prepare_levels_ram()
 
-        for stage_num in reversed(xrange(self.stages)):
-          if stage_num == (self.stages-1):
+        for level_num in reversed(xrange(self.levels)):
+          if level_num == (self.levels-1):
             for (i, row) in enumerate(self.match_ram):
               if i % 4 != 3:
                 # max value in last bucket
-                s = row[self.d_cnt-1]
-                print stage_num, i/4, i%4
-                self.stages_ram[ stage_num ][i/4][i%4] = s.l
+                s = row[self.cell_cnt-1]
+                print level_num, i/4, i%4
+                self.levels_ram[ level_num ][i/4][i%4] = s.l
           else:
-            for (i, row) in enumerate(self.stages_ram[ stage_num + 1 ]):
+            for (i, row) in enumerate(self.levels_ram[ level_num + 1 ]):
               if i % 4 != 3:
                 m = row[2]
-                self.stages_ram[ stage_num ][ i / 4 ][ i % 4 ] = m
+                self.levels_ram[ level_num ][ i / 4 ][ i % 4 ] = m
 
     def prepare_match_ram(self):
         self.match_ram = []
@@ -110,7 +110,7 @@ class QTreeRamGenerator():
         for i in xrange( self.LAST_TABLE_ADDR_CNT ):
             self.match_ram.append(list())
 
-            for j in xrange(self.d_cnt):
+            for j in xrange(self.cell_cnt):
                 s = Segment(self.MAX_VALUE, self.MIN_VALUE, do_check = False)
                 self.match_ram[i].append( s )
 
@@ -118,16 +118,16 @@ class QTreeRamGenerator():
         self.prepare_match_ram()
 
         for (i, s) in enumerate(self.segments.array):
-            addr = i / self.d_cnt
-            pos  = i % self.d_cnt
+            addr = i / self.cell_cnt
+            pos  = i % self.cell_cnt
             print addr, pos
             self.match_ram[addr][pos] = s
 
-    def write_stage_ram(self, fname):
+    def write_level_ram(self, fname):
       f = open( fname, "w" )
 
-      for (i, stage) in enumerate(self.stages_ram):
-          for (addr, data) in enumerate( stage ):
+      for (i, level) in enumerate(self.levels_ram):
+          for (addr, data) in enumerate( level ):
               wr_str = str(i) + " " + str( addr )
               for d in data:
                   wr_str = wr_str + " " + str( d )
@@ -149,6 +149,6 @@ if __name__ == "__main__":
     in_fname = sys.argv[1]
 
     in_data = InSegments(in_fname)
-    ram_gen = QTreeRamGenerator(stages = 4, d_cnt = 4, segments = in_data.segments)
-    ram_gen.write_stage_ram(in_fname + "_stage_ram")
+    ram_gen = QTreeRamGenerator(levels = 5, cell_cnt = 4, segments = in_data.segments)
+    ram_gen.write_level_ram(in_fname + "_level_ram")
     ram_gen.write_match_ram(in_fname + "_match_ram")

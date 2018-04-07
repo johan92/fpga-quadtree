@@ -82,7 +82,7 @@ end
 simple_ram_with_delay #( 
   .DATA_WIDTH       ( RAM_DATA_WIDTH                              ), 
   .ADDR_WIDTH       ( RAM_ADDR_WIDTH                              ),
-  .BYPASS_WIDTH     ( $bits(stage_0_in)                           ),
+  .BYPASS_WIDTH     ( $bits(stage0_in)                            ),
   .OUT_REG_ENABLE   ( RAM_OUT_REG_ENABLE                          )
 ) ram (
   .clk_i            ( clk_i                                       ),

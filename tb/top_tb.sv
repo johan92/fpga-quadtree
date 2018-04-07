@@ -45,19 +45,16 @@ initial
     rst_done = 1'b1;
   end
 
-Segments     segments;
 LevelRamData level_ram_data;
 MatchRamData match_ram_data;
 LookupData   lookup_data;
 
 initial
   begin
-    segments       = new();
     level_ram_data = new();
     match_ram_data = new();
     lookup_data    = new();
 
-    segments.load      ("./test_cases/test_01_segments"   );
     level_ram_data.load("./test_cases/test_01_level_ram"  );
     match_ram_data.load("./test_cases/test_01_match_ram"  );
     lookup_data.load   ("./test_cases/test_01_lookup_data");
@@ -123,6 +120,9 @@ endtask
 
 initial begin
   wait(ctrl_done);
+  
+  dut.ref_model.segments.load("./test_cases/test_01_segments");
+  dut.use_ref_model = 1'b1;
 
   foreach(lookup_data.q[i]) begin
     st_bfm_send(lookup_data.q[i]);

@@ -66,6 +66,9 @@ logic                     stage1_in_valid;
 match_pipe_data_t         stage1_out;
 logic                     stage1_out_valid;
 
+match_pipe_data_t         stage2_in;
+logic                     stage2_in_valid;
+
 assign in_data = in_data_i;
 
 //  --------------------------------------------------------------------------- 
@@ -94,7 +97,7 @@ generate
       simple_ram_with_delay #( 
         .DATA_WIDTH       ( RAM_DATA_WIDTH                              ), 
         .ADDR_WIDTH       ( RAM_ADDR_WIDTH                              ),
-        .BYPASS_WIDTH     ( $bits(stage_0_in)                           ),
+        .BYPASS_WIDTH     ( $bits(stage0_in)                            ),
         .OUT_REG_ENABLE   ( RAM_OUT_REG_ENABLE                          )
       ) ram (
         .clk_i            ( clk_i                                       ),
@@ -190,8 +193,9 @@ delay #(
 //  STAGE 2: Output Calculations
 //  ---------------------------------------------------------------------------
 
-assign lookup_valid_o = 'x; 
-assign lookup_match_o = 'x;
-assign lookup_addr_o  = 'x; // TODO
+assign lookup_valid_o  =   stage2_in_valid; 
+assign lookup_match_o  =   stage2_in.got_match;
+assign lookup_addr_o   = { stage2_in.in_data.addr, stage2_in.match_num };
+assign lookup_bypass_o =   stage2_in.bypass;
 
 endmodule

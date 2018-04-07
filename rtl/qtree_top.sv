@@ -161,10 +161,10 @@ qtree_match #(
   .in_bypass_i                           ( level_out_bypass_w [LEVEL_CNT-1] ),
   .in_valid_i                            ( level_out_valid_w  [LEVEL_CNT-1] ),
 
-  .lookup_match_o                        ( lookup_match_o          ),
-  .lookup_addr_o                         ( lookup_addr_o           ),
-  .lookup_bypass_o                       ( lookup_bypass_o         ),
-  .lookup_valid_o                        ( lookup_valid_o          )
+  .lookup_match_o                        ( lookup_match_o                   ),
+  .lookup_addr_o                         ( lookup_addr_o                    ),
+  .lookup_bypass_o                       ( lookup_bypass_o                  ),
+  .lookup_valid_o                        ( lookup_valid_o                   )
 
 );
 
@@ -187,6 +187,61 @@ endfunction
 initial begin
   display_parameters();
 end
+// synthesis translate_on
+
+//  --------------------------------------------------------------------------- 
+//  RefModel/SelfChecker
+//  ---------------------------------------------------------------------------
+
+// synthesis translate_off
+
+`include "segments.sv"
+`include "qtree_ref_model.sv"
+
+dut_in_t  checker_dut_in;
+logic     checker_dut_in_valid;
+
+dut_out_t checker_dut_out;
+logic     checker_dut_out_valid;
+
+always_comb begin
+  checker_dut_in.data    = lookup_data_i; 
+  checker_dut_in.bypass  = lookup_bypass_i;
+  checker_dut_in_valid   = lookup_valid_i;
+
+  checker_dut_out.match  = lookup_match_o;
+  checker_dut_out.addr   = lookup_addr_o;
+  checker_dut_out.bypass = lookup_bypass_o;
+  checker_dut_out_valid  = lookup_valid_o;
+end
+
+QTreeRefModel ref_model;
+bit           use_ref_model;
+
+initial begin
+  ref_model = new();
+end
+
+always_ff @( posedge clk_i ) begin
+  if(use_ref_model) begin
+
+    if(checker_dut_in_valid) begin
+      ref_model.put_dut_in(checker_dut_in);
+    end
+
+    if(checker_dut_out_valid) begin
+      ref_model.put_dut_out(checker_dut_out);
+    end
+
+  end
+end
+
+initial begin
+  wait(use_ref_model);
+
+  ref_model.thread_check();
+end
+
 // synthesis translate_on
 
 endmodule
