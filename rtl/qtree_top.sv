@@ -16,7 +16,16 @@ module qtree_top #(
 
   parameter LEVEL_RAM_DATA_WIDTH = -1,
   parameter MATCH_RAM_DATA_WIDTH = -1,
-  parameter MATCH_RAM_ADDR_WIDTH = -1
+  parameter MATCH_RAM_ADDR_WIDTH = -1,
+  
+  // regs enable
+  parameter LEVEL_RAM_OUT_REG_ENABLE    = 0, 
+  parameter LEVEL_STAGE0_OUT_REG_ENABLE = 0,
+  parameter LEVEL_STAGE1_OUT_REG_ENABLE = 0,
+  
+  parameter MATCH_RAM_OUT_REG_ENABLE    = 0, 
+  parameter MATCH_STAGE0_OUT_REG_ENABLE = 0,
+  parameter MATCH_STAGE1_OUT_REG_ENABLE = 0
 
 ) (
   input                            clk_i,
@@ -93,17 +102,17 @@ generate
       assign _mm_write = mm_ctrl_write_i && (is_mm_addr_level) && (g == mm_addr_level.level_num);
       
       qtree_level #( 
-        .ADDR_WIDTH             ( ADDR_WIDTH        ),  
-        .KEY_WIDTH              ( KEY_WIDTH         ),  
-        .DATA_WIDTH             ( LEVEL_DATA_WIDTH  ),  
-        .BYPASS_WIDTH           ( BYPASS_WIDTH      ),  
+        .ADDR_WIDTH             ( ADDR_WIDTH             ),  
+        .KEY_WIDTH              ( KEY_WIDTH              ),  
+        .DATA_WIDTH             ( LEVEL_DATA_WIDTH       ),  
+        .BYPASS_WIDTH           ( BYPASS_WIDTH           ),  
                                      
-        .RAM_ADDR_WIDTH         ( _RAM_ADDR_WIDTH   ), 
-        .RAM_DATA_WIDTH         ( LEVEL_RAM_DATA_WIDTH ),
+        .RAM_ADDR_WIDTH         ( _RAM_ADDR_WIDTH        ), 
+        .RAM_DATA_WIDTH         ( LEVEL_RAM_DATA_WIDTH   ),
                                      
-        .RAM_OUT_REG_ENABLE     ( 0                 ),  
-        .STAGE0_OUT_REG_ENABLE  ( 0                 ),  
-        .STAGE1_OUT_REG_ENABLE  ( 0                 )   
+        .RAM_OUT_REG_ENABLE     ( LEVEL_RAM_OUT_REG_ENABLE    ), 
+        .STAGE0_OUT_REG_ENABLE  ( LEVEL_STAGE0_OUT_REG_ENABLE ),  
+        .STAGE1_OUT_REG_ENABLE  ( LEVEL_STAGE1_OUT_REG_ENABLE )   
       ) level (
 
         .clk_i                  ( clk_i                  ),
@@ -144,9 +153,9 @@ qtree_match #(
   .MATCH_CELL_CNT                        ( MATCH_CELL_CNT          ),
   .MATCH_CELL_CNT_WIDTH                  ( MATCH_CELL_CNT_WIDTH    ),
                                                                 
-  .RAM_OUT_REG_ENABLE                    ( 0                       ),
-  .STAGE0_OUT_REG_ENABLE                 ( 0                       ),
-  .STAGE1_OUT_REG_ENABLE                 ( 0                       )
+  .RAM_OUT_REG_ENABLE                    ( MATCH_RAM_OUT_REG_ENABLE    ),
+  .STAGE0_OUT_REG_ENABLE                 ( MATCH_STAGE0_OUT_REG_ENABLE ),
+  .STAGE1_OUT_REG_ENABLE                 ( MATCH_STAGE1_OUT_REG_ENABLE )
 
 ) match (
   .clk_i                                 ( clk_i                   ),

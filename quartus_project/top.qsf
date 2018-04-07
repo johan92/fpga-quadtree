@@ -36,8 +36,8 @@
 # -------------------------------------------------------------------------- #
 
 
-set_global_assignment -name FAMILY "Stratix V"
-set_global_assignment -name DEVICE 5SGXEA7H3F35C3
+set_global_assignment -name FAMILY "Cyclone 10 LP"
+set_global_assignment -name DEVICE 10CL055YF484C8G
 set_global_assignment -name TOP_LEVEL_ENTITY top
 set_global_assignment -name ORIGINAL_QUARTUS_VERSION 17.1.0
 set_global_assignment -name PROJECT_CREATION_TIME_DATE "17:54:00  APRIL 07, 2018"
@@ -57,7 +57,6 @@ set_global_assignment -name POWER_PRESET_COOLING_SOLUTION "23 MM HEAT SINK WITH 
 set_global_assignment -name POWER_BOARD_THERMAL_MODEL "NONE (CONSERVATIVE)"
 set_global_assignment -name VERILOG_INPUT_VERSION SYSTEMVERILOG_2005
 set_global_assignment -name VERILOG_SHOW_LMF_MAPPING_MESSAGES OFF
-set_instance_assignment -name PARTITION_HIERARCHY root_partition -to | -section_id Top
 set_global_assignment -name SDC_FILE top.sdc
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/simple_ram_with_delay.sv
 set_global_assignment -name VERILOG_FILE ../rtl/simple_ram.v
@@ -66,3 +65,10 @@ set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/qtree_match.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/qtree_level.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../rtl/delay.sv
 set_global_assignment -name SYSTEMVERILOG_FILE top.sv
+
+set_instance_assignment -name VIRTUAL_PIN ON -to lookup_*_i
+set_instance_assignment -name VIRTUAL_PIN ON -to mm_ctrl_*_i
+set_instance_assignment -name VIRTUAL_PIN ON -to lookup_*_o
+set_global_assignment -name AUTO_SHIFT_REGISTER_RECOGNITION OFF
+set_global_assignment -name OPTIMIZATION_MODE "AGGRESSIVE PERFORMANCE"
+set_instance_assignment -name PARTITION_HIERARCHY root_partition -to | -section_id Top
