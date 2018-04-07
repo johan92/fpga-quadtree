@@ -29,7 +29,7 @@ simple_ram #(
   .DATA_WIDTH      ( DATA_WIDTH        ),
   .ADDR_WIDTH      ( ADDR_WIDTH        )
 ) ram (
-  .clk             ( clk               ),
+  .clk             ( clk_i             ),
    
   .data            ( wr_data_i         ),
   .write_addr      ( wr_addr_i         ),
